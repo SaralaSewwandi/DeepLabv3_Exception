@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0,1 python test.py --backbone resnet --lr 0.007 --workers 4 --batch-size 1 --gpu-ids 0,1 --checkname deeplab-resnet --eval-interval 1 --dataset pascal --resume /data/centos/pytorch-deeplab-xception-SSH/run/pascal/deeplab-resnet/model_best.pth.tar
