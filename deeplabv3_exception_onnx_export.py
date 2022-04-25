@@ -106,6 +106,9 @@ class ONNX_Generator(object):
         dummy_input = torch.randn(4, 3, 513, 513, device="cuda")
         torch.onnx.export(self.model, dummy_input, "/home/bmw/sarala/pytorch-deeplab-xception/onnx/test/deeplabv3_exception.onnx", verbose=True, input_names=input_names, output_names=output_names, opset_version=11,export_params=True)
         
+        print("JIT Trace Started")
+        module = torch.jit.trace(self.model, dummy_input)
+        print("JIT Trace Completed")
         '''
         dummy_input = torch.randn(1, 3, 513, 513, device="cuda")
         torch.onnx.export(self.model, dummy_input, "/home/bmw/sarala/pytorch-deeplab-xception/onnx/1x3x513x513/deeplabv3_exception.onnx", verbose=True, input_names=input_names, output_names=output_names, opset_version=11,export_params=True)

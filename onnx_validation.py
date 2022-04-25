@@ -126,6 +126,7 @@ class Predictor(object):
             with torch.no_grad():
                 #output = self.model(image)
                 ort_session = ort.InferenceSession("/home/bmw/sarala/pytorch-deeplab-xception/onnx/4x3x513x513/deeplabv3_exception.onnx")
+                #ort_session = ort.InferenceSession("/home/bmw/sarala/pytorch-deeplab-xception/onnx/4x3x513x513/simplified/simplified_deeplabv3_exception.onnx")
                 #print(type(ort_session.get_inputs()[0]))
                 ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(image)}
                 #print(type(ort_inputs['images']))
