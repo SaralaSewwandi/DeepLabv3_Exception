@@ -16,8 +16,12 @@ from utils.metrics import Evaluator
 
 from PIL import Image
 from dataloaders.datasets.pascal import VOCSegmentation
+import onnxruntime as ort
 
 import os
+
+def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
 class Predictor(object):
     def __init__(self, args):
@@ -104,29 +108,45 @@ class Predictor(object):
         self._check_dir('output/raw')
         self._check_dir('output/gt')
         self._check_dir('output/mask')
+    
         
     def validation(self, epoch=1):
+        print("Validation using ONNX Runtime")
         self.model.eval()
         self.evaluator.reset()
         tbar = tqdm(self.val_loader, desc='\r')
         test_loss = 0.0
+        count=0
         for i, sample in enumerate(tbar):
-            if(i==len(tbar)-1):
-              break
-            image, target = sample['image'], sample['label']
-            print("===",image.size())
-            if self.args.cuda:
-                image, target = image.cuda(), target.cuda()
-            with torch.no_grad():
-                output = self.model(image)
-            loss = self.criterion(output, target)
-            test_loss += loss.item()
-            tbar.set_description('Test loss: %.3f' % (test_loss / (i + 1)))
-            pred = output.data.cpu().numpy()
-            target = target.cpu().numpy()
-            pred = np.argmax(pred, axis=1)
-            # Add batch sample into evaluator
-            self.evaluator.add_batch(target, pred)
+            if(count<100):
+              if(i==len(tbar)-1):
+                break
+              image, target = sample['image'], sample['label']
+              if self.args.cuda:
+                  image, target = image.cuda(), target.cuda()
+                  print("===",image.size())
+              with torch.no_grad():
+                  #output = self.model(image)
+                  ort_session = ort.InferenceSession("/home/bmw/sarala/pytorch-deeplab-xception/onnx/4x3x513x513/deeplabv3_exception.onnx")
+                  #print(type(ort_session.get_inputs()[0]))
+                  ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(image)}
+                  #print(type(ort_inputs['images']))
+                  print(np.shape(ort_inputs['images']))
+                  output = ort_session.run(None, ort_inputs)
+                  #print(type(output))
+                  output=torch.Tensor(output)
+                  #print(output[0].size())
+                  count=count+1
+              loss = self.criterion(output[0].cuda(), target)
+              test_loss += loss.item()
+              tbar.set_description('Test loss: %.3f' % (test_loss / (i + 1)))
+              pred = output[0].data.cpu().numpy()
+              target = target.cpu().numpy()
+              pred = np.argmax(pred, axis=1)
+              # Add batch sample into evaluator
+              self.evaluator.add_batch(target, pred)
+            else:
+              exit()
 
         # Fast test during the training
         Acc = self.evaluator.Pixel_Accuracy()

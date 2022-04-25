@@ -12,6 +12,7 @@ class VOCSegmentation(Dataset):
     PascalVoc dataset
     """
     NUM_CLASSES = 21
+    image_paths = []
 
     def __init__(self,
                  args,
@@ -63,7 +64,9 @@ class VOCSegmentation(Dataset):
     def __len__(self):
         return len(self.images)
 
-
+    def image_paths():
+      image_paths
+      
     def __getitem__(self, index):
         _img, _target = self._make_img_gt_point_pair(index)
         sample = {'image': _img, 'label': _target}

@@ -7,6 +7,10 @@ output/
 #weights
 weights/
 
+#rawfiles
+raw_files/
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -14,8 +14,8 @@ def make_data_loader(args, **kwargs):
         train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
         val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
         test_loader = None
-
-        return train_loader, val_loader, test_loader, num_class
+        #print(val_set.images)
+        return train_loader,train_set.images, val_loader, val_set.images,test_loader, num_class
 
     elif args.dataset == 'cityscapes':
         train_set = cityscapes.CityscapesSegmentation(args, split='train')

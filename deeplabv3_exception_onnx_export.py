@@ -32,7 +32,7 @@ class ONNX_Generator(object):
 
         # Define Dataloader
         kwargs = {'num_workers': args.workers, 'pin_memory': True}
-        self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+        self.train_loader, self.train_set_images, self.val_loader, self.val_set_images, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
 
         # Define network
         model = DeepLab(num_classes=self.nclass,
@@ -99,10 +99,12 @@ class ONNX_Generator(object):
         #self.model.eval()
         input_names = ["images"]
         output_names = [ "output" ]
-        
+        '''
         dummy_input = torch.randn(4, 3, 513, 513, device="cuda")
         torch.onnx.export(self.model, dummy_input, "/home/bmw/sarala/pytorch-deeplab-xception/onnx/4x3x513x513/deeplabv3_exception.onnx", verbose=True, input_names=input_names, output_names=output_names, opset_version=11,export_params=True)
-        
+        '''
+        dummy_input = torch.randn(4, 3, 513, 513, device="cuda")
+        torch.onnx.export(self.model, dummy_input, "/home/bmw/sarala/pytorch-deeplab-xception/onnx/test/deeplabv3_exception.onnx", verbose=True, input_names=input_names, output_names=output_names, opset_version=11,export_params=True)
         
         '''
         dummy_input = torch.randn(1, 3, 513, 513, device="cuda")

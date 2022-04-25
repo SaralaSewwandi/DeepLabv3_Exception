@@ -104,94 +104,35 @@ class Predictor(object):
         self._check_dir('output/raw')
         self._check_dir('output/gt')
         self._check_dir('output/mask')
-        
-    def validation(self, epoch=1):
-        self.model.eval()
-        self.evaluator.reset()
-        tbar = tqdm(self.val_loader, desc='\r')
-        test_loss = 0.0
-        for i, sample in enumerate(tbar):
-            if(i==len(tbar)-1):
-              break
-            image, target = sample['image'], sample['label']
-            print("===",image.size())
-            if self.args.cuda:
-                image, target = image.cuda(), target.cuda()
-            with torch.no_grad():
-                output = self.model(image)
-            loss = self.criterion(output, target)
-            test_loss += loss.item()
-            tbar.set_description('Test loss: %.3f' % (test_loss / (i + 1)))
-            pred = output.data.cpu().numpy()
-            target = target.cpu().numpy()
-            pred = np.argmax(pred, axis=1)
-            # Add batch sample into evaluator
-            self.evaluator.add_batch(target, pred)
-
-        # Fast test during the training
-        Acc = self.evaluator.Pixel_Accuracy()
-        Acc_class = self.evaluator.Pixel_Accuracy_Class()
-        mIoU = self.evaluator.Mean_Intersection_over_Union()
-        FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
-        self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
-        self.writer.add_scalar('val/mIoU', mIoU, epoch)
-        self.writer.add_scalar('val/Acc', Acc, epoch)
-        self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
-        self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
-        print('Validation:')
-        print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
-        print('Loss: %.3f' % test_loss)
-
 
     def predict(self, epoch=1):
         self.model.eval()
         tbar = tqdm(self.val_loader, desc='\r')
         test_loss = 0.0
+        count=0
         for i, sample in enumerate(tbar):
+          if(count<100):
             self.evaluator.reset()
-
             image, target = sample['image'], sample['label']
-            if self.args.cuda:
-                image, target = image.cuda(), target.cuda()
-            with torch.no_grad():
-                output = self.model(image)
-            loss = self.criterion(output, target)
-            test_loss += loss.item()
-            tbar.set_description('Test loss: %.3f' % (test_loss / (i + 1)))
-            pred = output.data.cpu().numpy()
-            target = target.cpu().numpy()
-            pred = np.argmax(pred, axis=1)
-            # Add batch sample into evaluator & count
-            self.evaluator.add_batch(target, pred)
-            # Acc = self.evaluator.Pixel_Accuracy()
-            # Acc_class = self.evaluator.Pixel_Accuracy_Class()
-            mIoU = self.evaluator.Mean_Intersection_over_Union()
-            # FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
-            # composite name
-            pic_output = str(mIoU) + '.' + str(np.random.randint(100))
-            # raw picture
-            img = np.transpose(image[0].detach().cpu().numpy(), (1, 2, 0))
-            img *= (0.229, 0.224, 0.225)
-            img += (0.485, 0.456, 0.406)
-            img *= 255.0
-            img = img.astype(np.uint8)
-            img = Image.fromarray(img)
-            mask = pred[0]
-            # ground truth
-            mask_gt = VOCSegmentation.fill_colormap(target[0])
-            mask_gt = Image.fromarray(mask_gt)
-            # predict mask
-            mask = VOCSegmentation.fill_colormap(mask)
-            mask = Image.fromarray(mask)
+            print("===",self.val_set_images[count])
+            img_name = self.val_set_images[count].split('/')[-1].split('.')[0]
+            print(img_name)
+            total_name = img_name+".raw"
+            print(total_name)
+            print(image.size())
+            im_channel_last = image.permute(0, 2, 3, 1)
+            print("im", im_channel_last.size())
+            raw_file_loc="/home/bmw/sarala/pytorch-deeplab-xception/raw_files/"
+            print(type(im_channel_last))
+            im_channel_last=im_channel_last.cpu().numpy()
+            im_channel_last=np.float32(im_channel_last)
+            im_channel_last.tofile(raw_file_loc+total_name)
+            print(raw_file_loc+total_name)
+            count = count +1
+          else:
+            exit()
 
-            print('label {} miou is {}'.format(i, mIoU))
-            self._check_out_dir()
-            file_path = 'output/{}/{}.jpg'
-            img.save(file_path.format('raw', pic_output), format='jpeg')
-            mask_gt.save(file_path.format('gt', pic_output), format='jpeg')
-            mask.save(file_path.format('mask', pic_output), format='jpeg')
-
+            
 def main():
     parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
     parser.add_argument('--backbone', type=str, default='resnet',
@@ -306,7 +247,7 @@ def main():
     print(args)
     torch.manual_seed(args.seed)
     tester = Predictor(args)
-    tester.validation()
+    tester.predict()
     # print('Starting Epoch:', trainer.args.start_epoch)
     # print('Total Epoches:', trainer.args.epochs)
     # for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
