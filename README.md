@@ -89,8 +89,8 @@ Follow steps below to train your model:
 
 
 
-MYREPO
-onnx export
+###MYREPO
+###onnx export
 python deeplabv3_exception_onnx_export.py --backbone xception --dataset pascal 
 
 python validation.py --backbone xception --dataset pascal
@@ -98,3 +98,18 @@ Test loss: 0.690
 
 python onnx_validation.py --backbone xception --dataset pascal
 Test loss: 0.690
+
+###final scripts
+python test.py --backbone xception --dataset pascal 
+###baseline validation with val set
+python validation.py --backbone xception --dataset pascal 
+###onnx export
+python deeplabv3_exception_onnx_export.py --backbone xception --dataset pascal 
+###onnx validation with val set
+python onnx_validation.py --backbone xception --dataset pascal 
+###create raw files
+python create_100_raw_files.py --backbone xception --dataset pascal
+###onnx validation with 100 raw files
+python validation_100_raw_files.py --backbone xception --dataset pascal
+###onnx validation with 100 images
+python validation_100_images.py --backbone xception --dataset pascal
