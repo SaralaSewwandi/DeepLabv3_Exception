@@ -24,7 +24,11 @@ class SeparableConv2d(nn.Module):
         self.pointwise = nn.Conv2d(inplanes, planes, 1, 1, 0, 1, 1, bias=bias)
 
     def forward(self, x):
-        x = fixed_padding(x, self.conv1.kernel_size[0], dilation=self.conv1.dilation[0])
+        #x = fixed_padding(x, self.conv1.kernel_size[0], dilation=self.conv1.dilation[0])
+        #print("kernal size",self.conv1.kernel_size[0])
+        #print("dilation",self.conv1.dilation[0])
+        #hardcoded the kernal size and dilation params - inorder to be compatible with aimet ptq
+        x = fixed_padding(x, 3, dilation=1)
         x = self.conv1(x)
         x = self.bn(x)
         x = self.pointwise(x)
