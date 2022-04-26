@@ -188,7 +188,7 @@ def qat(args):
   '''
 
 class Predictor(object):
-    def __init__(self, args):
+    def __init__(self, args,ckpt ):
         self.args = args
 
         # Define Saver
@@ -200,7 +200,7 @@ class Predictor(object):
 
         # Define Dataloader
         kwargs = {'num_workers': args.workers, 'pin_memory': True}
-        self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+        self.train_loader, self.train_set_images, self.val_loader, self.val_set_images, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
 
         
         # Define network
@@ -209,7 +209,7 @@ class Predictor(object):
                         output_stride=args.out_stride,
                         sync_bn=args.sync_bn,
                         freeze_bn=args.freeze_bn)
-        
+
         train_params = [{'params': model.get_1x_lr_params(), 'lr': args.lr},
                         {'params': model.get_10x_lr_params(), 'lr': args.lr * 10}]
 
@@ -221,6 +221,7 @@ class Predictor(object):
         # whether to use class balanced weights
         if args.use_balanced_weights:
             classes_weights_path = os.path.join(Path.db_root_dir(args.dataset), args.dataset + '_classes_weights.npy')
+            print("===========",classes_weights_path)
             if os.path.isfile(classes_weights_path):
                 weight = np.load(classes_weights_path)
             else:
@@ -230,7 +231,8 @@ class Predictor(object):
             weight = None
         self.criterion = SegmentationLosses(weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
         self.model, self.optimizer = model, optimizer
-
+        
+        
         # Define Evaluator
         self.evaluator = Evaluator(self.nclass)
         # Define lr scheduler
@@ -243,12 +245,14 @@ class Predictor(object):
             patch_replication_callback(self.model)
             self.model = self.model.cuda()
 
+        
         # Resuming checkpoint
         self.best_pred = 0.0
         if args.resume is not None:
+            print("args.resume",args.resume)
             if not os.path.isfile(args.resume):
                 raise RuntimeError("=> no checkpoint found at '{}'".format(args.resume))
-            checkpoint = torch.load(args.resume)
+            checkpoint = ckpt
             args.start_epoch = checkpoint['epoch']
             if args.cuda:
                 self.model.module.load_state_dict(checkpoint['state_dict'])
@@ -263,6 +267,7 @@ class Predictor(object):
         # Clear start epoch if fine-tuning
         if args.ft:
             args.start_epoch = 0
+        
 
     def _check_dir(self, dir_name):
         if not os.path.exists(dir_name):
@@ -484,11 +489,11 @@ def main():
     #         trainer.validation(epoch)
     #tester.writer.close()
     
-    model = torch.load("/home/bmw/sarala/pytorch-deeplab-xception/weights/xception-b5690688.pth", map_location='cuda')
+    ckpt = torch.load("/home/bmw/sarala/pytorch-deeplab-xception/weights/xception-b5690688.pth", map_location='cuda')
     input_shape = (4, 3, 513, 513)
     
     
-    tester = Predictor(args)
+    tester = Predictor(args,ckpt)
     tester.validation()
     
     # modelScript = torch.jit.trace(model.to(torch.device('cpu')), torch.tensor(np.random.rand(1, 3, 384, 384).astype(np.float32)))
