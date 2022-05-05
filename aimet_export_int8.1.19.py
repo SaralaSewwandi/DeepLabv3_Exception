@@ -27,6 +27,8 @@ from aimet_torch.cross_layer_equalization import equalize_model
 from aimet_torch.quantsim import QuantParams, QuantizationSimModel 
 from aimet_common.defs import QuantScheme
 
+from metrics import StreamSegMetrics
+
 class Predictor(object):
     def __init__(self, args):
         self.args = args
@@ -154,6 +156,37 @@ class Predictor(object):
 
 
 
+#deeplabv3 resnet repo validation method https://github.com/VainF/DeepLabV3Plus-Pytorch    
+def validate(model,  args):
+  """Do validation and return specified samples"""
+  tester = Predictor(args)
+  model.eval()
+  metrics = StreamSegMetrics(21)
+  metrics.reset()
+  tbar = tqdm(tester.val_loader, desc='\r')
+  test_loss = 0.0
+  overall_miou =0
+  for i, sample in enumerate(tbar):
+      if(i==len(tbar)-1):
+        break
+      image, target = sample['image'], sample['label']
+      print("===",image.size())
+      if args.cuda:
+          image, target = image.cuda(), target.cuda()
+      with torch.no_grad():
+          output = model(image)
+      criterion = SegmentationLosses().build_loss(mode='ce')
+      loss = criterion(output, target)
+      test_loss += loss.item()
+      tbar.set_description('Test loss: %.3f' % (test_loss / (i + 1)))
+      pred = output.data.cpu().numpy()
+      target = target.cpu().numpy()
+      pred = np.argmax(pred, axis=1)
+      metrics.update(target, pred)
+
+  score = metrics.get_results()
+  print(score)
+
     
 def validation(model,  args):
         tester = Predictor(args)
@@ -184,23 +217,20 @@ def validation(model,  args):
             pred = np.argmax(pred, axis=1)
             # Add batch sample into evaluator
             evaluator.add_batch(target, pred)
-        print("test_loss",test_loss)
-        print("test_loss_bar",test_loss_bar)
-        # Fast test during the training
-        #Acc = evaluator.Pixel_Accuracy()
-        #Acc_class = evaluator.Pixel_Accuracy_Class()
-        #mIoU = evaluator.Mean_Intersection_over_Union()
-        #FWIoU = evaluator.Frequency_Weighted_Intersection_over_Union()
+        
+        Acc = self.evaluator.Pixel_Accuracy()
+        Acc_class = self.evaluator.Pixel_Accuracy_Class()
+        mIoU = self.evaluator.Mean_Intersection_over_Union()
+        FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
         #self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
         #self.writer.add_scalar('val/mIoU', mIoU, epoch)
         #self.writer.add_scalar('val/Acc', Acc, epoch)
         #self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         #self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
-        #print('Validation:')
-        #batch_size=4
-        #print('[Epoch: %d, numImages: %5d]' % (epoch, i * batch_size + image.data.shape[0]))
-        #print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
-        #print('Loss: %.3f' % test_loss) 
+        print('Validation:')
+        #print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
+        print("Acc:{}, Class_Acc:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
+        #print('Loss: %.3f' % test_loss)
         
  
 
@@ -326,35 +356,80 @@ def main():
     input_shape = (4, 3, 513, 513)
   
     dummy_input = torch.rand(input_shape)
-    equalize_model(model, input_shape)
+    #equalize_model(model, input_shape)
   
     print("Quantsim Started")
-  
+    
+    '''
     # quant_scheme = QuantScheme.post_training_tf_enhanced
     quantsim = QuantizationSimModel(model=model, quant_scheme="tf",
                                   dummy_input=dummy_input, rounding_mode='nearest',
                                   default_output_bw=8, default_param_bw=8)
+    
+    '''
+                         
+    quantsim = QuantizationSimModel(model=model, quant_scheme="tf_enhanced",
+                                  dummy_input=dummy_input, rounding_mode='nearest',
+                                  default_output_bw=8, default_param_bw=8)
+    '''
+    quantsim = QuantizationSimModel(model=model, quant_scheme="tf",
+                                  dummy_input=dummy_input, rounding_mode='nearest',
+                                  default_output_bw=8, default_param_bw=8)
+    
+    quantsim = QuantizationSimModel(model=model, quant_scheme="tf_enhanced",
+                                  dummy_input=dummy_input, rounding_mode='nearest',
+                                  default_output_bw=8, default_param_bw=8)
+    
                                   
+    quantsim = QuantizationSimModel(model=model, quant_scheme="tf_enhanced",
+                                  dummy_input=dummy_input, rounding_mode='nearest',
+                                  default_output_bw=16, default_param_bw=16)
+    '''                           
     print("Quantsim Completed")
   
     
     print("Compute Encodings Started")
   
     #quantsim.compute_encodings(forward_pass_callback=partial(evaluator, use_cuda=use_cuda),forward_pass_callback_args=iterations)
-    quantsim.compute_encodings(forward_pass_callback=validation, forward_pass_callback_args=args)
-  
+    #quantsim.compute_encodings(forward_pass_callback=validation, forward_pass_callback_args=args)
+    quantsim.compute_encodings(forward_pass_callback=validate, forward_pass_callback_args=args)
     print("Compute Encodings Completed")
   
     print("PTQ Accuracy")
-    validation(quantsim.model, args)
-  
+    #validation(quantsim.model, args)
+    validate(quantsim.model, args)
     #print("PTQ Accuracy",ptq_accuracy)
   
-    
+    '''
     quantsim.export(path="/home/bmw/sarala/pytorch-deeplab-xception/AIMET_1.19.1/ptq/tf_cle_8_8/",
      filename_prefix='deeplabv3_exception', dummy_input=torch.rand(input_shape, device="cpu"),
                   onnx_export_args=(aimet_torch.onnx_utils.OnnxExportApiArgs (opset_version=11)))
-           
+    
+    
+              
+    quantsim.export(path="/home/bmw/sarala/pytorch-deeplab-xception/AIMET_1.19.1/ptq/tf_enhanced_cle_8_8/",
+     filename_prefix='deeplabv3_exception', dummy_input=torch.rand(input_shape, device="cpu"),
+                  onnx_export_args=(aimet_torch.onnx_utils.OnnxExportApiArgs (opset_version=11)))
+    
+       
+    quantsim.export(path="/home/bmw/sarala/pytorch-deeplab-xception/AIMET_1.19.1/ptq/tf_int8/",
+     filename_prefix='deeplabv3_exception', dummy_input=torch.rand(input_shape, device="cpu"),
+                  onnx_export_args=(aimet_torch.onnx_utils.OnnxExportApiArgs (opset_version=11))) 
+    '''
+         
+    quantsim.export(path="/home/bmw/sarala/pytorch-deeplab-xception/AIMET_1.19.1/ptq/tf_enhanced_int8/",
+     filename_prefix='deeplabv3_exception', dummy_input=torch.rand(input_shape, device="cpu"),
+                  onnx_export_args=(aimet_torch.onnx_utils.OnnxExportApiArgs (opset_version=11))) 
+    '''
+    quantsim.export(path="/home/bmw/sarala/pytorch-deeplab-xception/AIMET_1.19.1/ptq/tf_enhanced_cle_16_16/",
+     filename_prefix='deeplabv3_exception', dummy_input=torch.rand(input_shape, device="cpu"),
+                  onnx_export_args=(aimet_torch.onnx_utils.OnnxExportApiArgs (opset_version=11))) 
+    
+    
+    quantsim.export(path="/home/bmw/sarala/pytorch-deeplab-xception/AIMET_1.19.1/ptq/tf_enhanced_int16/",
+     filename_prefix='deeplabv3_exception', dummy_input=torch.rand(input_shape, device="cpu"),
+                  onnx_export_args=(aimet_torch.onnx_utils.OnnxExportApiArgs (opset_version=11))) 
+    '''
                   
     # print('Starting Epoch:', trainer.args.start_epoch)
     # print('Total Epoches:', trainer.args.epochs)

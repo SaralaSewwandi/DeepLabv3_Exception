@@ -20,6 +20,8 @@ import onnxruntime as ort
 
 import os
 
+from metrics import StreamSegMetrics
+
 def to_numpy(tensor):
         return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
@@ -109,7 +111,47 @@ class Predictor(object):
         self._check_dir('output/gt')
         self._check_dir('output/mask')
     
-        
+    #deeplabv3 resnet repo validation method https://github.com/VainF/DeepLabV3Plus-Pytorch    
+    def validate(self, epoch=1):
+      """Do validation and return specified samples"""
+      print("Validation using ONNX Runtime")
+      metrics = StreamSegMetrics(21)
+      metrics.reset()
+      self.model.eval()
+      self.evaluator.reset()
+      tbar = tqdm(self.val_loader, desc='\r')
+      test_loss = 0.0
+      overall_miou =0
+      for i, sample in enumerate(tbar):
+          if(i==len(tbar)-1):
+            break
+          image, target = sample['image'], sample['label']
+          print("===",image.size())
+          if self.args.cuda:
+              image, target = image.cuda(), target.cuda()
+          with torch.no_grad():
+              #output = self.model(image)
+              ort_session = ort.InferenceSession("/home/bmw/sarala/pytorch-deeplab-xception/onnx/4x3x513x513/deeplabv3_exception.onnx")
+              #ort_session = ort.InferenceSession("/home/bmw/sarala/pytorch-deeplab-xception/onnx/4x3x513x513/simplified/simplified_deeplabv3_exception.onnx")
+              #print(type(ort_session.get_inputs()[0]))
+              ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(image)}
+              #print(type(ort_inputs['images']))
+              print(np.shape(ort_inputs['images']))
+              output = ort_session.run(None, ort_inputs)
+              #print(type(output))
+              output=torch.Tensor(output)
+              #print(output[0].size())
+          #loss = self.criterion(output[0].cuda(), target)
+          #test_loss += loss.item()
+          #tbar.set_description('Test loss: %.3f' % (test_loss / (i + 1)))
+          pred = output[0].data.cpu().numpy()
+          target = target.cpu().numpy()
+          pred = np.argmax(pred, axis=1)
+          metrics.update(target, pred)
+
+      score = metrics.get_results()
+      return score
+       
     def validation(self, epoch=1):
         print("Validation using ONNX Runtime")
         self.model.eval()
@@ -144,7 +186,6 @@ class Predictor(object):
             # Add batch sample into evaluator
             self.evaluator.add_batch(target, pred)
 
-        # Fast test during the training
         Acc = self.evaluator.Pixel_Accuracy()
         Acc_class = self.evaluator.Pixel_Accuracy_Class()
         mIoU = self.evaluator.Mean_Intersection_over_Union()
@@ -155,9 +196,9 @@ class Predictor(object):
         self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
         print('Validation:')
-        print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
-        print('Loss: %.3f' % test_loss)
+        #print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
+        print("Acc:{}, Class_Acc:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
+        #print('Loss: %.3f' % test_loss)
 
 
     def predict(self, epoch=1):
@@ -322,7 +363,13 @@ def main():
     print(args)
     torch.manual_seed(args.seed)
     tester = Predictor(args)
-    tester.validation()
+    #deeplab v3 exception validation method
+    #tester.validation()
+    
+    #deeplabv3 resnet repo validation method https://github.com/VainF/DeepLabV3Plus-Pytorch   
+    result = tester.validate()
+    print(result)
+    
     # print('Starting Epoch:', trainer.args.start_epoch)
     # print('Total Epoches:', trainer.args.epochs)
     # for epoch in range(trainer.args.start_epoch, trainer.args.epochs):

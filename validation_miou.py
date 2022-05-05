@@ -106,7 +106,7 @@ class Predictor(object):
         self._check_dir('output/raw')
         self._check_dir('output/gt')
         self._check_dir('output/mask')
-        
+      
     #deeplabv3 resnet repo validation method https://github.com/VainF/DeepLabV3Plus-Pytorch    
     def validate(self, epoch=1):
       """Do validation and return specified samples"""
@@ -136,13 +136,14 @@ class Predictor(object):
 
       score = metrics.get_results()
       return score
-    
-    #deeplabv3 exception backbone validation method      
+      
+    #deeplabv3 exception backbone validation method  
     def validation(self, epoch=1):
         self.model.eval()
         self.evaluator.reset()
         tbar = tqdm(self.val_loader, desc='\r')
         test_loss = 0.0
+        overall_miou =0
         for i, sample in enumerate(tbar):
             if(i==len(tbar)-1):
               break
@@ -160,7 +161,7 @@ class Predictor(object):
             pred = np.argmax(pred, axis=1)
             # Add batch sample into evaluator
             self.evaluator.add_batch(target, pred)
-
+            
         Acc = self.evaluator.Pixel_Accuracy()
         Acc_class = self.evaluator.Pixel_Accuracy_Class()
         mIoU = self.evaluator.Mean_Intersection_over_Union()
@@ -174,6 +175,9 @@ class Predictor(object):
         #print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print("Acc:{}, Class_Acc:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
         #print('Loss: %.3f' % test_loss)
+            
+
+
 
 
     def predict(self, epoch=1):
@@ -338,11 +342,7 @@ def main():
     print(args)
     torch.manual_seed(args.seed)
     tester = Predictor(args)
-    #deeplab v3 exception validation method
-    #tester.validation()
-    
-    #deeplabv3 resnet repo validation method https://github.com/VainF/DeepLabV3Plus-Pytorch   
-    result = tester.validate()
+    result=tester.validate()
     print(result)
     # print('Starting Epoch:', trainer.args.start_epoch)
     # print('Total Epoches:', trainer.args.epochs)
