@@ -6,7 +6,7 @@ class Path(object):
         elif dataset == 'sbd':
             return '/home/dataset/pascal_voc/benchmark_RELEASE/'  # folder that contains dataset/.
         elif dataset == 'cityscapes':
-            return '/path/to/datasets/cityscapes/'     # foler that contains leftImg8bit/
+            return '/media/bmw/DATA/public_dataset/CitysSapes/data/cityscapes/'     # foler that contains leftImg8bit/
         elif dataset == 'coco':
             return '/path/to/datasets/coco/'
         else:

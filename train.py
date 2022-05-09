@@ -27,7 +27,8 @@ class Trainer(object):
         
         # Define Dataloader
         kwargs = {'num_workers': args.workers, 'pin_memory': True}
-        self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+        self.train_loader, self.train_set_images, self.val_loader, self.val_set_images, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+        #self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
 
         # Define network
         model = DeepLab(num_classes=self.nclass,
@@ -185,7 +186,7 @@ def main():
     parser.add_argument('--dataset', type=str, default='pascal',
                         choices=['pascal', 'coco', 'cityscapes'],
                         help='dataset name (default: pascal)')
-    parser.add_argument('--use-sbd', action='store_true', default=True,
+    parser.add_argument('--use-sbd', action='store_true', default=False,
                         help='whether to use SBD dataset (default: True)')
     parser.add_argument('--workers', type=int, default=4,
                         metavar='N', help='dataloader threads')
